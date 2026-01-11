@@ -6,12 +6,13 @@ import Dashboard from './components/Dashboard';
 import Habits from './components/Habits';
 import Review from './components/Review';
 import Onboarding from './components/Onboarding';
+import Welcome from './components/Welcome';
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
-  const isMsgRoute = location.pathname === '/onboarding';
+  const isFullScreenRoute = location.pathname === '/onboarding' || location.pathname === '/welcome';
 
-  if (isMsgRoute) {
+  if (isFullScreenRoute) {
     return <main className="min-h-screen bg-gray-50">{children}</main>;
   }
 
@@ -84,8 +85,9 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 const AuthGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const user = dbService.user.get();
   
+  // If not onboarded, redirect to Welcome page
   if (!user.onboarded) {
-    return <Navigate to="/onboarding" replace />;
+    return <Navigate to="/welcome" replace />;
   }
 
   return <>{children}</>;
@@ -105,6 +107,7 @@ const App: React.FC = () => {
     <HashRouter>
       <Layout>
         <Routes>
+          <Route path="/welcome" element={<Welcome />} />
           <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/" element={<AuthGuard><Dashboard /></AuthGuard>} />
           <Route path="/habits" element={<AuthGuard><Habits /></AuthGuard>} />

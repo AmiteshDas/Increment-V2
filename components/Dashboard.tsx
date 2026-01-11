@@ -71,10 +71,14 @@ const Dashboard: React.FC = () => {
   };
 
   const handleReset = () => {
-    if (confirm('Start fresh? This will clear all data and launch the Onboarding flow.')) {
-      // Set a flag to tell the seeder to NOT seed demo data this time
+    if (confirm('Are you sure you want to reset all data? This cannot be undone.')) {
+      // Set a flag to skip demo seeding
       localStorage.setItem('increment_skip_seed', 'true');
+      
+      // Perform reset
       dbService.user.reset();
+      
+      // Reload page to re-trigger auth guard and welcome screen
       window.location.reload();
     }
   };
@@ -204,9 +208,9 @@ const Dashboard: React.FC = () => {
       <footer className="pt-8 border-t border-gray-200 flex justify-center">
         <button 
           onClick={handleReset}
-          className="text-xs text-red-300 hover:text-red-500 transition-colors uppercase tracking-widest font-bold"
+          className="text-xs text-red-300 hover:text-red-500 transition-colors uppercase tracking-widest font-bold opacity-50 hover:opacity-100"
         >
-          Reset App & Onboarding
+          Reset App
         </button>
       </footer>
 
