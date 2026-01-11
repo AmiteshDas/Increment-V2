@@ -1,13 +1,19 @@
 
 import React, { useEffect, useState } from 'react';
-import { HashRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { seedIfEmpty } from './storage';
+import { HashRouter, Routes, Route, Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
+import { seedIfEmpty, dbService } from './storage';
 import Dashboard from './components/Dashboard';
 import Habits from './components/Habits';
 import Review from './components/Review';
+import Onboarding from './components/Onboarding';
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
+  const isMsgRoute = location.pathname === '/onboarding';
+
+  if (isMsgRoute) {
+    return <main className="min-h-screen bg-gray-50">{children}</main>;
+  }
 
   const navItems = [
     { path: '/', label: 'Dashboard', icon: (
@@ -75,6 +81,16 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   );
 };
 
+const AuthGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const user = dbService.user.get();
+  
+  if (!user.onboarded) {
+    return <Navigate to="/onboarding" replace />;
+  }
+
+  return <>{children}</>;
+};
+
 const App: React.FC = () => {
   const [isLoaded, setIsLoaded] = useState(false);
 
@@ -89,9 +105,10 @@ const App: React.FC = () => {
     <HashRouter>
       <Layout>
         <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/habits" element={<Habits />} />
-          <Route path="/review" element={<Review />} />
+          <Route path="/onboarding" element={<Onboarding />} />
+          <Route path="/" element={<AuthGuard><Dashboard /></AuthGuard>} />
+          <Route path="/habits" element={<AuthGuard><Habits /></AuthGuard>} />
+          <Route path="/review" element={<AuthGuard><Review /></AuthGuard>} />
         </Routes>
       </Layout>
     </HashRouter>
