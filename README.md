@@ -1,10 +1,9 @@
 
 
-# Run and deploy your AI Studio app
+# Run and deploy Increment 
 
-This contains everything you need to run your app locally.
+Test URL : https://amiteshdas.github.io/Increment-V2/
 
-View your app in AI Studio: https://ai.studio/apps/drive/134XrSKNVTJJoEdxmOFIQUd0xre800XGg
 
 ## Run Locally
 
