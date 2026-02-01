@@ -130,11 +130,10 @@ const Review: React.FC = () => {
                           <td key={d} className="py-4 text-center">
                             <div className="flex justify-center">
                               {inc ? (
-                                  <div className={`w-6 h-6 rounded-md flex items-center justify-center text-white ${inc.effectiveFriction > 2.5 ? 'bg-red-500' : 'bg-green-500'}`}>
-                                    <span className="text-[10px] font-bold">{inc.effectiveFriction}</span>
+                                  <div className={`w-6 h-6 rounded-md shadow-sm ${inc.effectiveFriction > 2.5 ? 'bg-red-500' : inc.effectiveFriction > 1.5 ? 'bg-yellow-400' : 'bg-green-500'}`}>
                                   </div>
                               ) : (
-                                  <div className="w-6 h-6 rounded-md border-2 border-gray-100"></div>
+                                  <div className="w-6 h-6 rounded-md border-2 border-gray-50"></div>
                               )}
                             </div>
                           </td>

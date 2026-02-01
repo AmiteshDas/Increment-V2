@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { GoogleGenAI } from "@google/genai";
 import { dbService } from '../storage';
 import { Arc, Increment, EffortLevel } from '../types';
 
@@ -7,7 +8,12 @@ const Dashboard: React.FC = () => {
   const [arcs, setArcs] = useState<Arc[]>([]);
   const [todayLoad, setTodayLoad] = useState(0);
   const [increments, setIncrements] = useState<Increment[]>([]);
+  const [recentIncrements, setRecentIncrements] = useState<Increment[]>([]);
   const today = new Date().toISOString().split('T')[0];
+
+  // AI State
+  const [suggestions, setSuggestions] = useState<{arcName: string, description: string, reasoning: string}[]>([]);
+  const [isLoadingAI, setIsLoadingAI] = useState(false);
 
   // Form State for new Increment
   const [isLogging, setIsLogging] = useState<string | null>(null); // Arc ID being logged
@@ -20,7 +26,7 @@ const Dashboard: React.FC = () => {
     const allIncrements = dbService.increment.findMany();
     const todays = allIncrements.filter(i => i.date === today);
     
-    // Prioritization Sort: Middle > Early > Mature
+    // Sort logic: Middle > Early > Mature
     const sortedArcs = allArcs.sort((a, b) => {
         const score = (stage: string) => stage === 'Middle' ? 3 : stage === 'Early' ? 2 : 1;
         return score(b.stage) - score(a.stage);
@@ -28,6 +34,18 @@ const Dashboard: React.FC = () => {
 
     setArcs(sortedArcs);
     setIncrements(todays);
+
+    // Get unique recent increments for "Quick Repeat"
+    // Sort by date desc, then uniq by description
+    const recent = allIncrements
+        .sort((a, b) => b.date.localeCompare(a.date))
+        .filter((inc, index, self) => 
+            index === self.findIndex((t) => (
+                t.description === inc.description && t.arcId === inc.arcId
+            ))
+        )
+        .slice(0, 5); // Top 5 recent unique activities
+    setRecentIncrements(recent);
     
     // Calculate Daily Load
     const load = todays.reduce((acc, curr) => acc + curr.effectiveFriction, 0);
@@ -47,6 +65,70 @@ const Dashboard: React.FC = () => {
         setRepeat(true);
         fetchData();
     }
+  };
+
+  const handleQuickRepeat = (inc: Increment) => {
+      // Pre-fill form
+      setIsLogging(inc.arcId);
+      setDescription(inc.description);
+      setEffort(inc.effort);
+      setRepeat(inc.repeat);
+      // We don't auto-submit so the user can adjust effort if today feels different
+  };
+
+  const generateAISuggestions = async () => {
+    setIsLoadingAI(true);
+    try {
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        
+        // Prepare context for AI
+        const context = {
+            arcs: arcs.map(a => ({ name: a.name, stage: a.stage })),
+            recentHistory: recentIncrements.map(i => ({ 
+                arc: arcs.find(a => a.id === i.arcId)?.name, 
+                desc: i.description, 
+                effort: i.effort 
+            })),
+            currentLoad: todayLoad
+        };
+
+        const prompt = `
+            You are an expert performance coach. Based on the user's data below, suggest 3 specific increments for today.
+            Focus on "Middle" stage arcs as they are priority.
+            Considering the current daily load is ${todayLoad} (Scale: 0-3 is Low, 3-6 is Optimal, 6+ is High).
+            
+            User Data: ${JSON.stringify(context)}
+            
+            Return JSON only: { "suggestions": [{ "arcName": "string", "description": "string", "reasoning": "short string" }] }
+        `;
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-3-flash-preview',
+            contents: prompt,
+            config: { responseMimeType: "application/json" }
+        });
+
+        const text = response.text;
+        if (text) {
+            const data = JSON.parse(text);
+            if (data.suggestions) {
+                setSuggestions(data.suggestions);
+            }
+        }
+    } catch (e) {
+        console.error("AI Error", e);
+        alert("Could not generate suggestions. Check API Key configuration.");
+    } finally {
+        setIsLoadingAI(false);
+    }
+  };
+
+  const applySuggestion = (s: { arcName: string, description: string }) => {
+      const arc = arcs.find(a => a.name === s.arcName);
+      if (arc) {
+          setIsLogging(arc.id);
+          setDescription(s.description);
+      }
   };
 
   const handleReset = () => {
@@ -81,7 +163,74 @@ const Dashboard: React.FC = () => {
           </p>
       </div>
 
-      {/* Arcs List */}
+      {/* AI Coach Section */}
+      <section className="bg-gradient-to-br from-indigo-900 to-indigo-700 rounded-3xl p-6 text-white shadow-xl">
+          <div className="flex justify-between items-start mb-4">
+              <div>
+                <h3 className="text-xl font-bold flex items-center gap-2">
+                    ✨ AI Coach
+                </h3>
+                <p className="text-indigo-200 text-sm">Personalized suggestions based on your Arcs.</p>
+              </div>
+              <button 
+                onClick={generateAISuggestions} 
+                disabled={isLoadingAI}
+                className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors disabled:opacity-50"
+              >
+                {isLoadingAI ? 'Generating...' : 'Refresh'}
+              </button>
+          </div>
+
+          {suggestions.length === 0 && !isLoadingAI && (
+              <div className="text-center py-6 text-indigo-300 border-2 border-dashed border-indigo-500/30 rounded-xl">
+                  Tap refresh to analyze your data and get suggestions.
+              </div>
+          )}
+
+          <div className="grid gap-3">
+              {suggestions.map((s, i) => (
+                  <div key={i} className="bg-white/10 p-4 rounded-xl border border-white/10 hover:bg-white/20 transition-colors cursor-pointer" onClick={() => applySuggestion(s)}>
+                      <div className="flex justify-between items-start">
+                          <div>
+                            <span className="text-xs font-bold uppercase tracking-wider text-indigo-200 bg-indigo-900/50 px-2 py-0.5 rounded">{s.arcName}</span>
+                            <p className="font-bold text-lg mt-1">{s.description}</p>
+                            <p className="text-xs text-indigo-200 mt-1">{s.reasoning}</p>
+                          </div>
+                          <div className="bg-white text-indigo-900 p-2 rounded-full">
+                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
+                          </div>
+                      </div>
+                  </div>
+              ))}
+          </div>
+      </section>
+
+      {/* Quick Repeat Section */}
+      {recentIncrements.length > 0 && !isLogging && (
+          <section className="space-y-4">
+              <h3 className="text-xl font-bold text-gray-900">Quick Repeat</h3>
+              <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
+                  {recentIncrements.map(inc => {
+                      const arc = arcs.find(a => a.id === inc.arcId);
+                      return (
+                        <button 
+                            key={inc.id}
+                            onClick={() => handleQuickRepeat(inc)}
+                            className="flex-shrink-0 bg-white border border-gray-200 p-4 rounded-xl text-left hover:border-indigo-300 hover:shadow-md transition-all min-w-[160px]"
+                        >
+                            <div className="text-xs font-bold text-gray-400 uppercase mb-1">{arc?.name}</div>
+                            <div className="font-bold text-gray-900">{inc.description}</div>
+                            <div className="flex gap-2 mt-2">
+                                <span className="text-[10px] bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">{inc.effort}</span>
+                            </div>
+                        </button>
+                      );
+                  })}
+              </div>
+          </section>
+      )}
+
+      {/* Manual Log / Arcs List */}
       <section className="space-y-6">
         <h3 className="text-xl font-bold text-gray-900">Today's Increments</h3>
         <div className="grid gap-4">
