@@ -1,20 +1,22 @@
 
-export type HabitStatus = 'DONE' | 'PARTIAL' | 'SKIP' | 'PENDING';
+export type EffortLevel = 'Easy' | 'Medium' | 'Hard';
 
-export interface Habit {
+export interface Arc {
   id: string;
-  programId?: string; // Link to the detailed training plan
-  name: string;
-  minVersion: string;
+  name: string; // e.g. "Runner", "Reader"
+  stage: 'Early' | 'Middle' | 'Mature';
   archived: boolean;
   createdAt: string;
 }
 
-export interface CheckIn {
+export interface Increment {
   id: string;
-  habitId: string;
+  arcId: string;
   date: string; // YYYY-MM-DD
-  status: HabitStatus;
+  description: string; // "Run 5k"
+  effort: EffortLevel;
+  repeat: boolean; // Yes (sustainable) or No (unsustainable)
+  effectiveFriction: number; // Calculated
 }
 
 export interface DailyNote {
@@ -23,8 +25,9 @@ export interface DailyNote {
   text: string;
 }
 
-export interface HabitWithStatus extends Habit {
-  status: HabitStatus;
+export interface ArcWithStats extends Arc {
+  recentFriction: number; // For sorting/prioritization
+  totalIncrements: number;
 }
 
 export interface UserProfile {
@@ -46,5 +49,14 @@ export interface Program {
   intensity: string;
   why: string;
   weeks: ProgramWeek[];
+  createdAt: string;
+}
+
+export interface Habit {
+  id: string;
+  name: string;
+  minVersion: string;
+  archived: boolean;
+  programId?: string;
   createdAt: string;
 }
